@@ -1,0 +1,4 @@
+.zig-cache
+zig-out
+.clang-format
+.clangd
