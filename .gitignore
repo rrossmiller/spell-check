@@ -2,3 +2,10 @@
 zig-out
 .clang-format
 .clangd
+
+# hunspell
+*.aff
+*.dic
+
+# old
+aspellzig

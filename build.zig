@@ -65,8 +65,12 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
-    // link aspell
-    exe.linkSystemLibrary("aspell");
+    // link external word libs
+    // exe.linkSystemLibrary("aspell");
+    exe.linkSystemLibrary("hunspell");
+    exe.linkSystemLibrary("wn");
+
+
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
