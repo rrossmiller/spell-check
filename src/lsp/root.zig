@@ -6,7 +6,7 @@ const c = @cImport({
 });
 
 const SpellcheckError = error{InitError};
-pub fn init() !?*c.Hunhandle {
+pub fn init() !*c.Hunhandle {
     // hunspell
     const h = c.Hunspell_create("/Users/robrossmiller/Projects/spell-check/en_US.aff", "/Users/robrossmiller/Projects/spell-check/en_US.dic");
     if (h == null) {
@@ -24,7 +24,11 @@ pub fn init() !?*c.Hunhandle {
     } else {
         std.debug.print("WordNet initialized\n", .{});
     }
-    return h;
+    return h.?;
+}
+
+pub fn deinit(h: ?*c.Hunhandle) void {
+    defer c.Hunspell_destroy(h);
 }
 
 pub const DualString = struct {
@@ -67,11 +71,23 @@ pub fn get_suggestions(allocator: std.mem.Allocator, h: ?*c.Hunhandle, word: [*c
 
 const POS = [_]c_int{ c.NOUN, c.VERB, c.ADJ, c.ADV };
 /// get the definitions of a word
-pub fn def(word: [*c]u8) void {
+pub fn def(allocator: std.mem.Allocator, word: [*c]u8) !std.ArrayList(u8) {
+    var definition = std.ArrayList(u8).init(allocator);
+
     for (POS) |pos| {
         var x = c.findtheinfo_ds(word, pos, c.SYNS, c.ALLSENSES);
-
         while (x != null) {
+            var def_span: []u8 = std.mem.span(x.*.defn);
+            def_span = def_span[1 .. def_span.len - 1];
+            def_span[0] = capitalize(def_span[0]);
+            // std.mem.replaceScalar(u8, def_span, '(', ' ');
+            // std.mem.replaceScalar(u8, def_span, ')', ' ');
+            try definition.appendSlice("- ");
+            //TODO
+            // split ; for examples
+            try definition.appendSlice(def_span);
+            try definition.appendNTimes('\n', 2);
+
             std.debug.print("{s}\n", .{x.*.pos});
             std.debug.print("{s}\n", .{x.*.defn});
             std.debug.print("Synonyms:\n", .{});
@@ -83,4 +99,14 @@ pub fn def(word: [*c]u8) void {
         }
     }
     std.debug.print("____________________________________\n", .{});
+    _ = definition.pop(); // remove last new lines
+    _ = definition.pop();
+    return definition;
+}
+
+fn capitalize(char: u8) u8 {
+    if ((char > 'a' or char < 'z') and (char > 'A' or char < 'Z')) {
+        return char - 32;
+    }
+    return char;
 }

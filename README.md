@@ -1,8 +1,10 @@
 # Spellcheck lsp
 
-## dict and aff files:
+## Hunspell
 `brew install hunspell`
+
+### dict and aff files:
 https://github.com/LibreOffice/dictionaries/tree/master/en
 
-## wordnet
+## WordNet
 `brew install wordnet`
