@@ -18,6 +18,14 @@ pub fn ResponseMessage(comptime T: type) type {
         result: T,
     };
 }
+
+pub fn NotificationMessage(comptime T: type) type {
+    return struct {
+        method: []const u8,
+        params: T,
+    };
+}
+
 // COMMON
 const TextDocumentIdentifier = struct {
     uri: []const u8,
@@ -44,6 +52,7 @@ pub const InitializeResult = struct {
 pub const ServerCapabilities = struct {
     textDocumentSync: u16 = 1,
     hoverProvider: bool = true,
+    // diagnosticProvider: DiagnosticOptions = .{},
     // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion
     completionProvider: CompletionOptions = .{},
     // completionProvider: std.AutoHashMap(u8, u8),
@@ -54,16 +63,12 @@ pub const ServerCapabilities = struct {
     //     };
     // }
 };
-// pub const RegistrationParams = struct {
-//     method: []const u8 = "client/registerCapability",
-//     params: struct {
-//         registration: []const Registration,
-//     },
-// };
-// pub const Registration = struct {
-//     id: []const u8,
-//     method: []const u8,
-// };
+
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnosticOptions
+const DiagnosticOptions = struct {
+    interFileDependencies: bool = false,
+    workspaceDiagnostics: bool = false,
+};
 const CompletionOptions = struct {
     // triggerCharacters: ?[]u8 = null,
     // allCommitCharacters: ?[]u8 = null,
@@ -187,3 +192,34 @@ pub const DidCloseParams = struct {
     textDocument: TextDocumentIdentifier,
 };
 // < document/didClose
+
+// textDocument/publishDiagnostics >
+pub const PublishDiagnosticsParams = struct {
+    uri: []const u8,
+    diagnostics: []const Diagnostic,
+};
+
+pub const Diagnostic = struct {
+    range: Range = .{
+        .start = .{ .line = 0, .character = 0 },
+        .end = .{ .line = 0, .character = 5 },
+    },
+    message: []const u8 = "test diagnostic",
+};
+
+const Range = struct {
+    start: Position,
+    end: Position,
+};
+
+pub fn newPublishDiagnosticsParams(method: []const u8, uri: []const u8, diagnostics: []const Diagnostic) NotificationMessage(PublishDiagnosticsParams) {
+    return .{
+        .method = method,
+        .params = .{
+            .uri = uri,
+            .diagnostics = diagnostics,
+        },
+    };
+}
+
+// < textDocument/publishDiagnostics

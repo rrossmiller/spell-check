@@ -72,36 +72,40 @@ pub fn get_suggestions(allocator: std.mem.Allocator, h: ?*c.Hunhandle, word: [*c
 const POS = [_]c_int{ c.NOUN, c.VERB, c.ADJ, c.ADV };
 /// get the definitions of a word
 pub fn def(allocator: std.mem.Allocator, word: [*c]u8) !std.ArrayList(u8) {
-    var definition = std.ArrayList(u8).init(allocator);
+    var definitions = std.ArrayList(u8).init(allocator);
 
     for (POS) |pos| {
         var x = c.findtheinfo_ds(word, pos, c.SYNS, c.ALLSENSES);
         while (x != null) {
             var def_span: []u8 = std.mem.span(x.*.defn);
-            def_span = def_span[1 .. def_span.len - 1];
+            def_span = def_span[1 .. def_span.len - 1]; // remove the parens that surround each definition
             def_span[0] = capitalize(def_span[0]);
-            // std.mem.replaceScalar(u8, def_span, '(', ' ');
-            // std.mem.replaceScalar(u8, def_span, ')', ' ');
-            try definition.appendSlice("- ");
-            //TODO
-            // split ; for examples
-            try definition.appendSlice(def_span);
-            try definition.appendNTimes('\n', 2);
+            try definitions.appendSlice("- ");
 
-            std.debug.print("{s}\n", .{x.*.pos});
-            std.debug.print("{s}\n", .{x.*.defn});
-            std.debug.print("Synonyms:\n", .{});
-            for (0..@intCast(x.*.wcount)) |i| {
-                const syn = x.*.words[i];
-                std.debug.print("\t{s}\n", .{syn});
+            // split ; for example usages
+            var example_split = std.mem.splitScalar(u8, def_span, ';');
+
+            try definitions.appendSlice(example_split.first());
+            while (example_split.next()) |ex| {
+                try definitions.appendSlice("\n\t");
+                try definitions.appendSlice(ex);
             }
+            try definitions.appendNTimes('\n', 2);
+
+            // std.debug.print("{s}\n", .{x.*.pos});
+            // std.debug.print("{s}\n", .{x.*.defn});
+            // std.debug.print("Synonyms:\n", .{});
+            // for (0..@intCast(x.*.wcount)) |i| {
+            //     const syn = x.*.words[i];
+            //     std.debug.print("\t{s}\n", .{syn});
+            // }
             x = x.*.nextss;
         }
     }
-    std.debug.print("____________________________________\n", .{});
-    _ = definition.pop(); // remove last new lines
-    _ = definition.pop();
-    return definition;
+    // std.debug.print("____________________________________\n", .{});
+    _ = definitions.pop(); // remove last new lines
+    _ = definitions.pop();
+    return definitions;
 }
 
 fn capitalize(char: u8) u8 {

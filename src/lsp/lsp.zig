@@ -82,8 +82,11 @@ pub fn hover(allocator: std.mem.Allocator, params: *const structs.HoverParams, c
         const w = line[start_idx .. end_idx + 1];
         const word = try allocator.dupeZ(u8, w);
 
-        return try root.def(allocator, word);
-        // return word;
+        const def = try root.def(allocator, word);
+        for (def.items) |value| {
+            std.debug.print("def {}\n", .{value});
+        }
+        return def;
     }
     return null;
 }

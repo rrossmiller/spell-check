@@ -67,8 +67,6 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
     //https://www.reddit.com/r/Zig/comments/1bignpf/json_serialization_and_taggeddiscrimated_unions/
     //https://zigbin.io/651078
 
-    //TODO replace alloc with arena alloc and deinit on rtn?
-
     switch (try lsp.MessageType.get(base_message.method)) {
         // Requests
         .Initialize => {
@@ -115,6 +113,21 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
             const params = parsed.value.params.?;
             try state.open_document(params.textDocument.uri, params.textDocument.text);
             std.log.info("Opened: {s}", .{params.textDocument.uri});
+
+            // // diagnostic notification not quite working
+            // // however, uri dosnt look right either
+            //
+            // // init diagnostics
+            // // TODO
+            // const d = [_]lsp_structs.Diagnostic{
+            //     lsp_structs.Diagnostic{},
+            // };
+            //
+            // // send diagnostics
+            // const res =
+            //     lsp_structs.newPublishDiagnosticsParams("textDocument/publishDiagnostics",
+            // params.textDocument.uri, &d);
+            // try write_response(allocator, stdout.writer(), res);
         },
         .DidChange => {
             const parsed = try rpc.readMessage(allocator, &base_message, lsp_structs.RequestMessage(lsp_structs.DidChangeParams));
@@ -149,7 +162,7 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
 fn write_response(allocator: std.mem.Allocator, stdout: std.fs.File.Writer, res: anytype) !void {
     const r = try std.json.stringifyAlloc(allocator, res, .{ .whitespace = .indent_2 });
     defer allocator.free(r);
-    std.debug.print("{s}\n", .{r});
+    std.debug.print("sending message: {s}\n", .{r});
     const msg = try std.fmt.allocPrint(allocator, "Content-Length: {d}\r\n\r\n{s}", .{ r.len, r });
     defer allocator.free(msg);
     try stdout.writeAll(msg);
