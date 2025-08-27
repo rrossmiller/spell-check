@@ -63,9 +63,8 @@ pub fn main() !void {
         defer base_message.deinit(aren_allocator);
 
         run = try handle_message(aren_allocator, base_message, h, &state, &stdout_writer.interface);
-    try stdout_writer.interface.flush();
+        try stdout_writer.interface.flush();
     }
-
 }
 
 fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h: *c.Hunhandle, state: *State, stdout: *std.Io.Writer) !bool {
@@ -168,14 +167,15 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
 
 fn write_response(allocator: std.mem.Allocator, stdout: *std.Io.Writer, res: anytype) !void {
     const fmt = std.json.fmt(res, .{ .whitespace = .indent_2 });
-    var r_array = try std.ArrayList(u8).initCapacity(allocator, 128);
-    defer r_array.deinit(allocator);
+    var arraylist = try std.ArrayList(u8).initCapacity(allocator, 128);
+    defer arraylist.deinit(allocator);
 
     var b: [128]u8 = undefined;
-    var w = r_array.writer(allocator).adaptToNewApi(&b);
+    var w = arraylist.writer(allocator).adaptToNewApi(&b);
     try fmt.format(&w.new_interface);
     try w.new_interface.flush();
-    const r = r_array.items;
+
+    const r = arraylist.items;
     // std.debug.print("sending message: {s}\n", .{r});
 
     const msg = try std.fmt.allocPrint(allocator, "Content-Length: {d}\r\n\r\n{s}", .{ r.len, r });
