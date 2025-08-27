@@ -1,11 +1,7 @@
 const std = @import("std");
 const structs = @import("structs.zig");
 const root = @import("root.zig");
-const c = @cImport({
-    @cInclude("string.h");
-    @cInclude("hunspell.h");
-    @cInclude("wn.h");
-});
+const c = root.c;
 
 pub const LspError = error{MethodNotImplemented};
 pub const MessageType = enum {
@@ -48,7 +44,7 @@ pub const MessageType = enum {
     }
 };
 
-pub fn hover(allocator: std.mem.Allocator, params: *const structs.HoverParams, contents: []const u8, _: *c.Hunhandle) !?std.ArrayList(u8) {
+pub fn hover(allocator: std.mem.Allocator, params: *const structs.HoverParams, contents: []const u8, _: *c.Hunhandle) !?*std.ArrayList(u8) {
     var lines = std.mem.splitScalar(u8, contents, '\n');
 
     // skip lines to get to the current line
@@ -82,11 +78,8 @@ pub fn hover(allocator: std.mem.Allocator, params: *const structs.HoverParams, c
         const w = line[start_idx .. end_idx + 1];
         const word = try allocator.dupeZ(u8, w);
 
-        const def = try root.def(allocator, word);
-        for (def.items) |value| {
-            std.debug.print("def {}\n", .{value});
-        }
-        return def;
+        var def = try root.def(allocator, word);
+        return &def;
     }
     return null;
 }

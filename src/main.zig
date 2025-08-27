@@ -1,29 +1,33 @@
 const std = @import("std");
 const root = @import("lsp/root.zig");
+const c = @import("lsp/root.zig").c;
 const lsp = @import("lsp/lsp.zig");
 const lsp_structs = @import("lsp/structs.zig");
 const rpc = @import("lsp/rpc.zig");
 const State = @import("lsp/state.zig").State;
-const c = @cImport({
-    @cInclude("string.h");
-    @cInclude("hunspell.h");
-    @cInclude("wn.h");
-});
 
 const MAX_WORD_LEN = 100;
 const version = "0.0.1";
 
 pub fn main() !void {
-    const stdin = std.io.getStdIn();
-    const stdout = std.io.getStdOut();
+    var stdout_b: [512]u8 = undefined;
+    var stdout = std.fs.File.stdout();
+    var stdout_writer = stdout.writer(&stdout_b);
+
+    var stdin_b: [512]u8 = undefined;
+    var stdin = std.fs.File.stdin();
+    var stdin_reader = stdin.reader(&stdin_b);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+
     defer {
         const check = gpa.deinit();
         switch (check) {
             .ok => {},
-            .leak => std.debug.print("leaked\n", .{}),
+            .leak => {
+                std.debug.print("leaked\n", .{});
+            },
         }
     }
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -38,7 +42,8 @@ pub fn main() !void {
             try stdout.writeAll(version);
             return;
         } else if (std.mem.eql(u8, cmd, "-ex")) {
-            try ex(allocator);
+            // try ex(allocator);
+            std.debug.print("not implemented\n", .{});
             return;
         }
     }
@@ -52,16 +57,16 @@ pub fn main() !void {
     defer state.deinit();
     var run = true;
     while (run) {
-        const parsed = try rpc.BaseMessage.readMessage(aren_allocator, stdin.reader());
+        const parsed = try rpc.BaseMessage.readMessage(aren_allocator, &stdin_reader.interface);
         defer parsed.deinit();
         const base_message = parsed.value;
         defer base_message.deinit(aren_allocator);
 
-        run = try handle_message(aren_allocator, base_message, h, &state, stdout);
+        run = try handle_message(aren_allocator, base_message, h, &state, &stdout_writer.interface);
     }
 }
 
-fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h: *c.Hunhandle, state: *State, stdout: std.fs.File) !bool {
+fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h: *c.Hunhandle, state: *State, stdout: *std.Io.Writer) !bool {
     //TODO
     //impl json parse
     //https://www.reddit.com/r/Zig/comments/1bignpf/json_serialization_and_taggeddiscrimated_unions/
@@ -74,7 +79,7 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
             defer parsed.deinit();
             std.log.info("Connected to: {s}", .{parsed.value.params.?.clientInfo.name});
             const res = lsp_structs.newInitializeResponse(parsed.value.id);
-            try write_response(allocator, stdout.writer(), res);
+            try write_response(allocator, stdout, res);
         },
         .Hover => {
             const parsed = try rpc.readMessage(allocator, &base_message, lsp_structs.RequestMessage(lsp_structs.HoverParams));
@@ -84,11 +89,11 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
             // const len = try std.fmt.allocPrint(allocator, "{d}", .{state.documents.get(params.textDocument.uri).?.len});
             if (state.documents.get(params.textDocument.uri)) |contents| {
                 if (try lsp.hover(allocator, &params, contents, h)) |doc| {
-                    defer doc.deinit();
+                    // defer doc.deinit(allocator);
                     const msg = doc.items;
 
                     const res = lsp_structs.newHoverResponse(parsed.value.id, msg);
-                    try write_response(allocator, stdout.writer(), res);
+                    try write_response(allocator, stdout, res);
                 }
             }
         },
@@ -159,38 +164,53 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
     return true;
 }
 
-fn write_response(allocator: std.mem.Allocator, stdout: std.fs.File.Writer, res: anytype) !void {
-    const r = try std.json.stringifyAlloc(allocator, res, .{ .whitespace = .indent_2 });
-    defer allocator.free(r);
-    std.debug.print("sending message: {s}\n", .{r});
+fn write_response(allocator: std.mem.Allocator, stdout: *std.Io.Writer, res: anytype) !void {
+    // const r = try std.json.stringifyAlloc(allocator, res, .{ .whitespace = .indent_2 });
+    // defer allocator.free(r);
+    // const stringified = std.json.Stringify{ .indent_level = 2 };
+    // try stringified.write(res);
+    // stringified.writer.flush();
+
+    const fmt = std.json.fmt(res, .{ .whitespace = .indent_2 });
+    var r_array = try std.ArrayList(u8).initCapacity(allocator, 128);
+    defer r_array.deinit(allocator);
+    var b: [128]u8 = undefined;
+    var w = r_array.writer(allocator).adaptToNewApi(&b);
+    try fmt.format(&w.new_interface);
+    try w.new_interface.flush();
+
+    const r = r_array.items;
+    std.debug.print("sending message: {s}<<\n", .{r});
+
     const msg = try std.fmt.allocPrint(allocator, "Content-Length: {d}\r\n\r\n{s}", .{ r.len, r });
     defer allocator.free(msg);
     try stdout.writeAll(msg);
 }
 
-fn ex(allocator: std.mem.Allocator) !void {
-    const h = try root.init();
-    defer root.deinit(h);
-
-    const stdin_reader = std.io.getStdIn().reader();
-    std.debug.print("Enter words:\n\n", .{});
-    const buf = try allocator.alloc(u8, MAX_WORD_LEN);
-    defer allocator.free(buf);
-
-    var dual_str = try root.read_c_str(stdin_reader, buf);
-    while (dual_str.c_str.* != 0) {
-        if (try root.get_suggestions(allocator, h, dual_str.c_str)) |suggestions| {
-            defer allocator.free(suggestions);
-            for (suggestions) |s| {
-                defer allocator.free(s);
-                std.debug.print("{s}\n", .{s});
-            }
-        }
-
-        // definition
-        const x = try root.def(allocator, dual_str.c_str);
-        x.deinit();
-        std.debug.print("\n", .{});
-        dual_str = try root.read_c_str(stdin_reader, buf);
-    }
-}
+// fn ex(allocator: std.mem.Allocator) !void {
+//     const h = try root.init();
+//     defer root.deinit(h);
+//
+//     var b: [128]u8 = undefined;
+//     var stdin_reader = std.fs.File.stdin().reader(&b).interface;
+//     std.debug.print("Enter words:\n\n", .{});
+//     const buf = try allocator.alloc(u8, MAX_WORD_LEN);
+//     defer allocator.free(buf);
+//
+//     var dual_str = try root.read_c_str(stdin_reader, buf);
+//     while (dual_str.c_str.* != 0) {
+//         if (try root.get_suggestions(allocator, h, dual_str.c_str)) |suggestions| {
+//             defer allocator.free(suggestions);
+//             for (suggestions) |s| {
+//                 defer allocator.free(s);
+//                 std.debug.print("{s}\n", .{s});
+//             }
+//         }
+//
+//         // definition
+//         const x = try root.def(allocator, dual_str.c_str);
+//         x.deinit();
+//         std.debug.print("\n", .{});
+//         dual_str = try root.read_c_str(stdin_reader, buf);
+//     }
+// }

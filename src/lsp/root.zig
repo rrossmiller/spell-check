@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @cImport({
+pub const c = @cImport({
     @cInclude("string.h");
     @cInclude("hunspell.h");
     @cInclude("wn.h");
@@ -72,7 +72,7 @@ pub fn get_suggestions(allocator: std.mem.Allocator, h: ?*c.Hunhandle, word: [*c
 const POS = [_]c_int{ c.NOUN, c.VERB, c.ADJ, c.ADV };
 /// get the definitions of a word
 pub fn def(allocator: std.mem.Allocator, word: [*c]u8) !std.ArrayList(u8) {
-    var definitions = std.ArrayList(u8).init(allocator);
+    var definitions = try std.ArrayList(u8).initCapacity(allocator, 4);
 
     for (POS) |pos| {
         var x = c.findtheinfo_ds(word, pos, c.SYNS, c.ALLSENSES);
@@ -80,17 +80,17 @@ pub fn def(allocator: std.mem.Allocator, word: [*c]u8) !std.ArrayList(u8) {
             var def_span: []u8 = std.mem.span(x.*.defn);
             def_span = def_span[1 .. def_span.len - 1]; // remove the parens that surround each definition
             def_span[0] = capitalize(def_span[0]);
-            try definitions.appendSlice("- ");
+            try definitions.appendSlice(allocator, "- ");
 
             // split ; for example usages
             var example_split = std.mem.splitScalar(u8, def_span, ';');
 
-            try definitions.appendSlice(example_split.first());
+            try definitions.appendSlice(allocator, example_split.first());
             while (example_split.next()) |ex| {
-                try definitions.appendSlice("\n\t");
-                try definitions.appendSlice(ex);
+                try definitions.appendSlice(allocator, "\n\t");
+                try definitions.appendSlice(allocator, ex);
             }
-            try definitions.appendNTimes('\n', 2);
+            try definitions.appendNTimes(allocator, '\n', 2);
 
             // std.debug.print("{s}\n", .{x.*.pos});
             // std.debug.print("{s}\n", .{x.*.defn});
