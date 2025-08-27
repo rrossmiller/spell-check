@@ -54,7 +54,7 @@ pub const ServerCapabilities = struct {
     hoverProvider: bool = true,
     // diagnosticProvider: DiagnosticOptions = .{},
     // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion
-    completionProvider: CompletionOptions = .{},
+    // completionProvider: CompletionOptions = .{},
     // completionProvider: std.AutoHashMap(u8, u8),
     // pub fn init(allocator: std.mem.Allocator) !ServerCapabilities {
     //     const map = try std.AutoHashMap(u8, u8).init(allocator);
@@ -82,19 +82,6 @@ pub fn newInitializeResponse(id: ?u32) ResponseMessage(InitializeResult) {
     const r = ResponseMessage(InitializeResult){
         .id = id,
         .result = .{},
-    };
-    return r;
-}
-
-pub fn anewInitializeResponse(allocator: std.mem.Allocator, id: ?u32) ResponseMessage(InitializeResult) {
-    const map = std.AutoHashMap(u8, u8).init(allocator);
-    const r = ResponseMessage(InitializeResult){
-        .id = id,
-        .result = .{
-            .capabilities = .{
-                .completionProvider = map,
-            },
-        },
     };
     return r;
 }
