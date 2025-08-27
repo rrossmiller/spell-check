@@ -1,5 +1,5 @@
 const std = @import("std");
-const structs = @import("../lsp/structs.zig");
+const structs = @import("structs.zig");
 
 pub const BaseMessage = struct {
     jsonrpc: ?[]const u8 = null,

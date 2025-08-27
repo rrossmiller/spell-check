@@ -54,7 +54,7 @@ pub fn hover(allocator: std.mem.Allocator, params: *const structs.HoverParams, c
 
     // work on the line
     if (lines.next()) |line| {
-        var i = if (params.position.character > 0) params.position.character - 1 else 0;
+        var i = if (params.position.character > 0) params.position.character else 0;
         var start_idx: u32 = 0;
         var end_idx: u32 = 0;
         //search backwards until space
@@ -75,9 +75,7 @@ pub fn hover(allocator: std.mem.Allocator, params: *const structs.HoverParams, c
             }
         }
 
-        const w = line[start_idx .. end_idx + 1];
-        const word = try allocator.dupeZ(u8, w);
-
+        const word = line[start_idx .. end_idx + 1];
         var def = try root.def(allocator, word);
         return &def;
     }

@@ -49,7 +49,8 @@ pub fn read_c_str(reader: std.fs.File.Reader, buf: []u8) !DualString {
 }
 
 /// Spellcheck the word and return any suggestions
-pub fn get_suggestions(allocator: std.mem.Allocator, h: ?*c.Hunhandle, word: [*c]const u8) !?[][]u8 {
+pub fn get_suggestions(allocator: std.mem.Allocator, h: ?*c.Hunhandle, word_zig: []const u8) !?[][]u8 {
+    const word = try allocator.dupeZ(u8, word_zig); // convert the word to a c string
     const ok = c.Hunspell_spell(h, word);
     std.debug.print("> {s}\n", .{word});
 
@@ -71,8 +72,12 @@ pub fn get_suggestions(allocator: std.mem.Allocator, h: ?*c.Hunhandle, word: [*c
 
 const POS = [_]c_int{ c.NOUN, c.VERB, c.ADJ, c.ADV };
 /// get the definitions of a word
-pub fn def(allocator: std.mem.Allocator, word: [*c]u8) !std.ArrayList(u8) {
+pub fn def(allocator: std.mem.Allocator, word_zig: []const u8) !std.ArrayList(u8) {
+    const word = try allocator.dupeZ(u8, word_zig); // convert the word to a c string
     var definitions = try std.ArrayList(u8).initCapacity(allocator, 4);
+    var output = try std.ArrayList(u8).initCapacity(allocator, 4);
+
+    defer definitions.deinit(allocator);
 
     for (POS) |pos| {
         var x = c.findtheinfo_ds(word, pos, c.SYNS, c.ALLSENSES);
@@ -95,21 +100,42 @@ pub fn def(allocator: std.mem.Allocator, word: [*c]u8) !std.ArrayList(u8) {
             // std.debug.print("{s}\n", .{x.*.pos});
             // std.debug.print("{s}\n", .{x.*.defn});
             // std.debug.print("Synonyms:\n", .{});
-            // for (0..@intCast(x.*.wcount)) |i| {
-            //     const syn = x.*.words[i];
-            //     std.debug.print("\t{s}\n", .{syn});
-            // }
+            for (0..@intCast(x.*.wcount)) |i| {
+                const syn: []u8 = std.mem.span(x.*.words[i]);
+
+                // exclude synonymes that are the same as the entry word
+                if (!std.mem.eql(u8, word_zig, syn) and !std.mem.containsAtLeast(u8, output.items, 1, syn)) {
+                    // replace "_" with <space>
+                    for (0..syn.len) |j| {
+                        if (syn[j] == '_') {
+                            syn[j] = ' ';
+                        }
+                    }
+
+                    // std.debug.print("\t{s}\n", .{syn});
+                    try output.appendSlice(allocator, syn);
+                    // try definitions.append(allocator, ',');
+                    try output.appendSlice(allocator, ", ");
+                }
+            }
             x = x.*.nextss;
         }
     }
     // std.debug.print("____________________________________\n", .{});
     _ = definitions.pop(); // remove last new lines
     _ = definitions.pop();
-    return definitions;
+
+    // remove last comma space
+    _ = output.pop();
+    _ = output.pop();
+
+    try output.appendNTimes(allocator, '\n', 2);
+    try output.appendSlice(allocator, definitions.items);
+    return output;
 }
 
 fn capitalize(char: u8) u8 {
-    if ((char > 'a' or char < 'z') and (char > 'A' or char < 'Z')) {
+    if (char > 'a' or char < 'z') {
         return char - 32;
     }
     return char;

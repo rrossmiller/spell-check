@@ -1,10 +1,10 @@
 const std = @import("std");
-const root = @import("lsp/root.zig");
-const c = @import("lsp/root.zig").c;
-const lsp = @import("lsp/lsp.zig");
-const lsp_structs = @import("lsp/structs.zig");
-const rpc = @import("lsp/rpc.zig");
-const State = @import("lsp/state.zig").State;
+const root = @import("root.zig");
+const c = @import("root.zig").c;
+const lsp = @import("lsp.zig");
+const lsp_structs = @import("structs.zig");
+const rpc = @import("rpc.zig");
+const State = @import("state.zig").State;
 
 const MAX_WORD_LEN = 100;
 const version = "0.0.1";
