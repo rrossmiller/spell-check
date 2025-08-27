@@ -166,18 +166,22 @@ fn handle_message(allocator: std.mem.Allocator, base_message: rpc.BaseMessage, h
 }
 
 fn write_response(allocator: std.mem.Allocator, stdout: *std.Io.Writer, res: anytype) !void {
-    const fmt = std.json.fmt(res, .{ .whitespace = .indent_2 });
-    var arraylist = try std.ArrayList(u8).initCapacity(allocator, 128);
-    defer arraylist.deinit(allocator);
+    // var arraylist = try std.ArrayList(u8).initCapacity(allocator, 128);
+    // defer arraylist.deinit(allocator);
+    // var b: [128]u8 = undefined;
+    // var w = arraylist.writer(allocator).adaptToNewApi(&b);
+    // try fmt.format(&w.new_interface);
+    // try w.new_interface.flush();
 
-    var b: [128]u8 = undefined;
-    var w = arraylist.writer(allocator).adaptToNewApi(&b);
-    try fmt.format(&w.new_interface);
-    try w.new_interface.flush();
-
-    const r = arraylist.items;
+    // const r = arraylist.items;
     // std.debug.print("sending message: {s}\n", .{r});
 
+    const fmt = std.json.fmt(res, .{ .whitespace = .indent_2 });
+
+    var writer = std.Io.Writer.Allocating.init(allocator);
+    try fmt.format(&writer.writer);
+
+    const r = try writer.toOwnedSlice();
     const msg = try std.fmt.allocPrint(allocator, "Content-Length: {d}\r\n\r\n{s}", .{ r.len, r });
     defer allocator.free(msg);
     try stdout.writeAll(msg);
