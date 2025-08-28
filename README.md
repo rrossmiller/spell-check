@@ -1,5 +1,7 @@
 # Spellcheck lsp
 
+Please read this whole readme to get the lsp built and working in your system.
+
 ## Hunspell
 
 `brew install hunspell`
