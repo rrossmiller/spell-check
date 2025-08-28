@@ -4,7 +4,6 @@ build:
 
 build-nvim: build
     @mkdir -p ~/.local/state/nvim/spellcheck-lsp/
-    @rm ~/.local/state/nvim/spellcheck-lsp/lsp
     cp zig-out/bin/spell_check ~/.local/state/nvim/spellcheck-lsp/lsp
 
 test:
